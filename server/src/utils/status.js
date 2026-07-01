@@ -1,11 +1,13 @@
-// Calcula o status do produto a partir da quantidade em estoque
-export function calcularStatus(qtd) {
+export function calcularStatus(qtd, estoqueMinimo = 5) {
   if (qtd <= 0) return "Crítico";
-  if (qtd <= 5) return "Baixo";
+  if (qtd <= estoqueMinimo) return "Baixo";
   return "Normal";
 }
 
-// Adiciona o campo virtual "status" a um produto vindo do banco
 export function comStatus(produto) {
-  return { ...produto, status: calcularStatus(produto.qtd) };
+  return {
+    ...produto,
+    status: calcularStatus(produto.qtd, produto.estoqueMinimo),
+    abaixoDoMinimo: produto.qtd <= produto.estoqueMinimo,
+  };
 }

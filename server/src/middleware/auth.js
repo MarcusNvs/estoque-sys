@@ -1,37 +1,38 @@
 import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
+import { AppError } from "./erros.js";
 
-const JWT_SECRET = process.env.JWT_SECRET || "segredo-padrao";
-
-// Protege rotas privadas exigindo um token JWT valido no header Authorization
 export function autenticar(req, res, next) {
   const header = req.headers.authorization || "";
   const [tipo, token] = header.split(" ");
 
   if (tipo !== "Bearer" || !token) {
-    return res.status(401).json({ erro: "Token nao fornecido." });
+    return next(new AppError(401, "Token não fornecido."));
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.usuario = payload;
+    req.usuario = jwt.verify(token, env.JWT_SECRET);
     next();
   } catch {
-    return res.status(401).json({ erro: "Token invalido ou expirado." });
+    next(new AppError(401, "Token inválido ou expirado."));
   }
 }
 
-// Restringe a rota a usuarios com papel de administrador
-export function apenasAdmin(req, res, next) {
-  if (req.usuario?.papel !== "admin") {
-    return res.status(403).json({ erro: "Acesso restrito a administradores." });
-  }
-  next();
+export function autorizar(...papeis) {
+  return (req, res, next) => {
+    if (!papeis.includes(req.usuario?.papel)) {
+      return next(new AppError(403, "Acesso restrito para o seu perfil."));
+    }
+    next();
+  };
 }
+
+export const apenasAdmin = autorizar("admin");
 
 export function gerarToken(usuario) {
   return jwt.sign(
     { id: usuario.id, nome: usuario.nome, email: usuario.email, papel: usuario.papel },
-    JWT_SECRET,
-    { expiresIn: "7d" }
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN }
   );
 }

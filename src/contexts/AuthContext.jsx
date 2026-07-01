@@ -55,6 +55,16 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  const aceitarConvite = async (token, nome, senha) => {
+    try {
+      const dados = await api.post("/convites/aceitar", { token, nome, senha }, { auth: false });
+      aplicarSessao(dados);
+      return { sucesso: true };
+    } catch (e) {
+      return { sucesso: false, mensagem: e.message };
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem(CHAVE_TOKEN);
     definirToken(null);
@@ -62,7 +72,7 @@ const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ usuarioLogado, carregando, login, logout, cadastrar }}>
+    <AuthContext.Provider value={{ usuarioLogado, carregando, login, logout, cadastrar, aceitarConvite }}>
       {children}
     </AuthContext.Provider>
   );

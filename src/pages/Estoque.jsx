@@ -123,6 +123,7 @@ const CadastrosEstoque = ({ produtos, recarregar }) => {
   const [categoria, setCategoria] = useState("");
   const [qtd, setQtd] = useState("");
   const [preco, setPreco] = useState("");
+  const [estoqueMinimo, setEstoqueMinimo] = useState("");
   const [erro, setErro] = useState("");
   const [sucesso, setSucesso] = useState("");
   const [modalRemover, setModalRemover] = useState(null);
@@ -131,13 +132,15 @@ const CadastrosEstoque = ({ produtos, recarregar }) => {
     if (!nome || !categoria || !qtd || !preco) { setErro("Preencha todos os campos."); return; }
     const qtdNum = parseInt(qtd);
     const precoNum = parseFloat(preco);
+    const minimoNum = estoqueMinimo === "" ? 5 : parseInt(estoqueMinimo);
     if (isNaN(qtdNum) || qtdNum < 0) { setErro("Quantidade inválida."); return; }
     if (isNaN(precoNum) || precoNum < 0) { setErro("Preço inválido."); return; }
+    if (isNaN(minimoNum) || minimoNum < 0) { setErro("Estoque mínimo inválido."); return; }
 
     try {
-      await api.post("/produtos", { nome, categoria, qtd: qtdNum, preco: precoNum });
+      await api.post("/produtos", { nome, categoria, qtd: qtdNum, preco: precoNum, estoqueMinimo: minimoNum });
       setSucesso(`Produto "${nome}" cadastrado!`);
-      setNome(""); setCategoria(""); setQtd(""); setPreco(""); setErro("");
+      setNome(""); setCategoria(""); setQtd(""); setPreco(""); setEstoqueMinimo(""); setErro("");
       await recarregar();
       setTimeout(() => setSucesso(""), 3000);
     } catch (e) {
@@ -175,7 +178,11 @@ const CadastrosEstoque = ({ produtos, recarregar }) => {
             <label className="form-label">Quantidade</label>
             <input className="form-input" type="number" min="0" placeholder="0" value={qtd} onChange={(e) => { setQtd(e.target.value); setErro(""); }} />
           </div>
-          <div className="form-group" style={{ marginBottom: 0, gridColumn: "1/-1" }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Estoque mínimo</label>
+            <input className="form-input" type="number" min="0" placeholder="5" value={estoqueMinimo} onChange={(e) => { setEstoqueMinimo(e.target.value); setErro(""); }} />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Preço unitário (R$)</label>
             <input className="form-input" type="number" min="0" step="0.01" placeholder="0,00" value={preco} onChange={(e) => { setPreco(e.target.value); setErro(""); }} />
           </div>
@@ -186,7 +193,7 @@ const CadastrosEstoque = ({ produtos, recarregar }) => {
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         <table>
           <thead>
-            <tr><th>Produto</th><th>Categoria</th><th>Qtd</th><th>Preço</th><th></th></tr>
+            <tr><th>Produto</th><th>Categoria</th><th>Qtd</th><th>Mínimo</th><th>Preço</th><th></th></tr>
           </thead>
           <tbody>
             {produtos.map(p => (
@@ -194,6 +201,7 @@ const CadastrosEstoque = ({ produtos, recarregar }) => {
                 <td style={{ fontWeight: 500 }}>{p.nome}</td>
                 <td><span className="badge badge-cinza">{p.categoria}</span></td>
                 <td style={{ fontFamily: "'DM Mono', monospace" }}>{p.qtd}</td>
+                <td style={{ fontFamily: "'DM Mono', monospace", color: p.abaixoDoMinimo ? "#c0392b" : "#7c7b6e" }}>{p.estoqueMinimo}</td>
                 <td style={{ fontFamily: "'DM Mono', monospace" }}>R$ {p.preco.toFixed(2)}</td>
                 <td><button className="btn-perigo" onClick={() => setModalRemover(p)}>Remover</button></td>
               </tr>
@@ -356,11 +364,11 @@ const Estoque = () => {
   const recarregar = useCallback(async () => {
     try {
       const [listaProdutos, listaBaixas] = await Promise.all([
-        api.get("/produtos"),
-        api.get("/baixas"),
+        api.get("/produtos?limit=100"),
+        api.get("/baixas?limit=100"),
       ]);
-      setProdutos(listaProdutos);
-      setBaixas(listaBaixas);
+      setProdutos(listaProdutos.dados);
+      setBaixas(listaBaixas.dados);
       setErro("");
     } catch (e) {
       setErro(e.message);

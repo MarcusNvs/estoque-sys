@@ -1,12 +1,14 @@
 import { Router } from "express";
 import prisma from "../prisma.js";
-import { autenticar } from "../middleware/auth.js";
+import { autenticar, autorizar } from "../middleware/auth.js";
+import { asyncHandler, AppError } from "../middleware/erros.js";
+import { baixaSchemas, schemaPaginacao } from "../validators/index.js";
+import { montarResposta } from "../utils/paginacao.js";
 
 const router = Router();
 
 router.use(autenticar);
 
-// Formata a baixa para o front
 function formatar(baixa) {
   return {
     id: baixa.id,
@@ -20,49 +22,58 @@ function formatar(baixa) {
   };
 }
 
-// GET /api/baixas  (historico, mais recentes primeiro)
-router.get("/", async (req, res) => {
-  const baixas = await prisma.baixa.findMany({
-    include: { produto: true, usuario: true },
-    orderBy: { criadoEm: "desc" },
-  });
-  return res.json(baixas.map(formatar));
-});
+const queryBaixas = schemaPaginacao(["id", "quantidade", "criadoEm"], "criadoEm");
 
-// POST /api/baixas  (registra baixa e abate do estoque)
-router.post("/", async (req, res) => {
-  const { produtoId, quantidade, motivo } = req.body;
-  const qtd = parseInt(quantidade, 10);
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    const { page, limit, sort, order } = queryBaixas.parse(req.query);
 
-  const produto = await prisma.produto.findUnique({ where: { id: Number(produtoId) } });
-  if (!produto) {
-    return res.status(404).json({ erro: "Selecione um produto valido." });
-  }
-  if (Number.isNaN(qtd) || qtd <= 0) {
-    return res.status(400).json({ erro: "Informe uma quantidade valida." });
-  }
-  if (qtd > produto.qtd) {
-    return res.status(400).json({ erro: `Estoque insuficiente. Disponivel: ${produto.qtd}` });
-  }
+    const [total, baixas] = await Promise.all([
+      prisma.baixa.count(),
+      prisma.baixa.findMany({
+        include: { produto: true, usuario: true },
+        orderBy: { [sort]: order },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
 
-  // Cria a baixa e abate o estoque de forma atomica
-  const [baixa] = await prisma.$transaction([
-    prisma.baixa.create({
-      data: {
-        produtoId: produto.id,
-        quantidade: qtd,
-        motivo: motivo || null,
-        usuarioId: req.usuario.id,
-      },
-      include: { produto: true, usuario: true },
-    }),
-    prisma.produto.update({
-      where: { id: produto.id },
-      data: { qtd: produto.qtd - qtd },
-    }),
-  ]);
+    res.json(montarResposta({ dados: baixas.map(formatar), total, page, limit }));
+  })
+);
 
-  return res.status(201).json(formatar(baixa));
-});
+router.post(
+  "/",
+  autorizar("admin", "operador"),
+  asyncHandler(async (req, res) => {
+    const { produtoId, quantidade, motivo } = baixaSchemas.criar.parse(req.body);
+
+    const baixa = await prisma.$transaction(async (tx) => {
+      const atualizados = await tx.produto.updateMany({
+        where: { id: produtoId, qtd: { gte: quantidade } },
+        data: { qtd: { decrement: quantidade } },
+      });
+
+      if (atualizados.count === 0) {
+        const produto = await tx.produto.findUnique({ where: { id: produtoId } });
+        if (!produto) throw new AppError(404, "Selecione um produto válido.");
+        throw new AppError(400, `Estoque insuficiente. Disponível: ${produto.qtd}`);
+      }
+
+      return tx.baixa.create({
+        data: {
+          produtoId,
+          quantidade,
+          motivo: motivo || null,
+          usuarioId: req.usuario.id,
+        },
+        include: { produto: true, usuario: true },
+      });
+    });
+
+    res.status(201).json(formatar(baixa));
+  })
+);
 
 export default router;

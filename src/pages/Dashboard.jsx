@@ -1,34 +1,42 @@
+import { useState, useEffect } from "react";
+import { api } from "../services/api";
+
 const Dashboard = () => {
+  const [dados, setDados] = useState(null);
+  const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    api
+      .get("/dashboard")
+      .then(setDados)
+      .catch((e) => setErro(e.message))
+      .finally(() => setCarregando(false));
+  }, []);
+
+  if (carregando) return <p style={{ color: "#9b9989", fontSize: 14 }}>Carregando...</p>;
+  if (erro) return <div className="alerta alerta-erro">{erro}</div>;
+
+  const m = dados.metricas;
+  const valorFormatado = m.valorTotalEstoque.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
   const metricas = [
-    { label: "Produtos", valor: "247", delta: "+12 este mês", positivo: true },
-    { label: "Estoque baixo", valor: "8", delta: "Atenção necessária", positivo: false },
-    { label: "Baixas (mês)", valor: "94", delta: "+7% vs anterior", positivo: true },
-    { label: "Usuários", valor: "12", delta: "+2 convidados", positivo: true },
-  ];
-  const alertas = [
-    { produto: "Cabo USB-C 2m", qtd: 2, tipo: "Crítico" },
-    { produto: "Papel A4 resma", qtd: 5, tipo: "Baixo" },
-    { produto: "Caneta azul cx", qtd: 3, tipo: "Crítico" },
-    { produto: "Grampeador med.", qtd: 7, tipo: "Baixo" },
-  ];
-  const ultimasMovimentacoes = [
-    { produto: "Monitor 24\" Full HD", tipo: "Entrada", qtd: 5, data: "20/05/2026", usuario: "Admin" },
-    { produto: "Teclado mecânico", tipo: "Saída", qtd: 2, data: "19/05/2026", usuario: "João" },
-    { produto: "Cadeira ergonômica", tipo: "Entrada", qtd: 10, data: "18/05/2026", usuario: "Admin" },
-    { produto: "Cabo HDMI 2m", tipo: "Saída", qtd: 4, data: "17/05/2026", usuario: "João" },
+    { label: "Produtos", valor: m.totalProdutos, delta: `${m.criticos} em nível crítico`, positivo: m.criticos === 0 },
+    { label: "Estoque baixo", valor: m.estoqueBaixo, delta: m.estoqueBaixo > 0 ? "Atenção necessária" : "Tudo em ordem", positivo: m.estoqueBaixo === 0 },
+    { label: "Baixas (mês)", valor: m.baixasMes, delta: "Movimentações registradas", positivo: true },
+    { label: "Usuários", valor: m.totalUsuarios, delta: `${m.convitesPendentes} convite(s) pendente(s)`, positivo: true },
   ];
 
   return (
     <div>
       <h1 className="pagina-titulo">Dashboard</h1>
-      <p className="pagina-subtitulo">Visão geral do sistema — maio 2026</p>
+      <p className="pagina-subtitulo">Visão geral do sistema · valor em estoque R$ {valorFormatado}</p>
 
       <div className="metricas-grid">
-        {metricas.map((m, i) => (
+        {metricas.map((item, i) => (
           <div key={i} className="card-metrica">
-            <div className="card-metrica-label">{m.label}</div>
-            <div className="card-metrica-valor">{m.valor}</div>
-            <div className={`card-metrica-delta ${m.positivo ? "delta-positivo" : "delta-negativo"}`}>{m.delta}</div>
+            <div className="card-metrica-label">{item.label}</div>
+            <div className="card-metrica-valor">{item.valor}</div>
+            <div className={`card-metrica-delta ${item.positivo ? "delta-positivo" : "delta-negativo"}`}>{item.delta}</div>
           </div>
         ))}
       </div>
@@ -37,8 +45,10 @@ const Dashboard = () => {
         <div className="card">
           <div style={{ fontSize: 13, fontWeight: 600, color: "#7c7b6e", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Alertas de estoque</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {alertas.map((a, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < alertas.length - 1 ? "1px solid #f0ede6" : "none" }}>
+            {dados.alertas.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#9b9989", fontStyle: "italic" }}>Nenhum produto abaixo do mínimo.</p>
+            ) : dados.alertas.map((a, i) => (
+              <div key={a.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < dados.alertas.length - 1 ? "1px solid #f0ede6" : "none" }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a18" }}>{a.produto}</div>
                   <div style={{ fontSize: 11, color: "#9b9989" }}>{a.qtd} unidades</div>
@@ -52,13 +62,15 @@ const Dashboard = () => {
         <div className="card">
           <div style={{ fontSize: 13, fontWeight: 600, color: "#7c7b6e", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 16 }}>Últimas movimentações</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {ultimasMovimentacoes.map((m, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < ultimasMovimentacoes.length - 1 ? "1px solid #f0ede6" : "none" }}>
+            {dados.ultimasMovimentacoes.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#9b9989", fontStyle: "italic" }}>Nenhuma baixa registrada ainda.</p>
+            ) : dados.ultimasMovimentacoes.map((mov, i) => (
+              <div key={mov.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < dados.ultimasMovimentacoes.length - 1 ? "1px solid #f0ede6" : "none" }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a18" }}>{m.produto}</div>
-                  <div style={{ fontSize: 11, color: "#9b9989" }}>{m.data} · {m.usuario}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: "#1a1a18" }}>{mov.produto}</div>
+                  <div style={{ fontSize: 11, color: "#9b9989" }}>{mov.data} · {mov.usuario}</div>
                 </div>
-                <span className={`badge ${m.tipo === "Entrada" ? "badge-verde" : "badge-azul"}`}>{m.tipo} {m.qtd}</span>
+                <span className="badge badge-azul">Baixa {mov.qtd}</span>
               </div>
             ))}
           </div>

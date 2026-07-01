@@ -10,8 +10,8 @@ const GerencUsuarios = () => {
 
   const recarregar = useCallback(async () => {
     try {
-      const lista = await api.get("/usuarios");
-      setUsuarios(lista);
+      const lista = await api.get("/usuarios?limit=100");
+      setUsuarios(lista.dados);
       setErro("");
     } catch (e) {
       setErro(e.message);

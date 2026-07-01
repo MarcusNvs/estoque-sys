@@ -16,16 +16,32 @@ model Usuario {
   status    String   @default("Ativo")
   criadoEm  DateTime @default(now())
   baixas    Baixa[]
+  convites  Convite[]
 }
 
 model Produto {
-  id        Int      @id @default(autoincrement())
-  nome      String
-  categoria String
-  qtd       Int      @default(0)
-  preco     Float    @default(0)
-  criadoEm  DateTime @default(now())
-  baixas    Baixa[]
+  id            Int      @id @default(autoincrement())
+  nome          String
+  categoria     String
+  qtd           Int      @default(0)
+  preco         Float    @default(0)
+  estoqueMinimo Int      @default(5)
+  criadoEm      DateTime @default(now())
+  baixas        Baixa[]
+}
+
+model Convite {
+  id         Int       @id @default(autoincrement())
+  email      String
+  papel      String    @default("operador")
+  token      String    @unique
+  status     String    @default("Pendente")
+  expiraEm   DateTime
+  criadoEm   DateTime  @default(now())
+  aceitoEm   DateTime?
+
+  convidadoPor   Usuario? @relation(fields: [convidadoPorId], references: [id], onDelete: SetNull)
+  convidadoPorId Int?
 }
 
 model Baixa {

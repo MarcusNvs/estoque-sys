@@ -12,9 +12,12 @@ import Contato from "./pages/Contato";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import AreaAdmin from "./pages/AreaAdmin";
+import AceitarConvite from "./pages/AceitarConvite";
+
+const tokenConvite = new URLSearchParams(window.location.search).get("convite");
 
 export default function App() {
-  const [paginaAtual, setPaginaAtual] = useState("home");
+  const [paginaAtual, setPaginaAtual] = useState(tokenConvite ? "convite" : "home");
 
   const renderizarPagina = () => {
     switch (paginaAtual) {
@@ -41,6 +44,7 @@ export default function App() {
       );
       case "login": return <Login setPaginaAtual={setPaginaAtual} />;
       case "cadastro": return <Cadastro setPaginaAtual={setPaginaAtual} />;
+      case "convite": return <AceitarConvite token={tokenConvite} setPaginaAtual={setPaginaAtual} />;
       case "admin": return (
         <RotaProtegida setPaginaAtual={setPaginaAtual}>
           <AreaAdmin setPaginaAtual={setPaginaAtual} />
